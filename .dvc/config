@@ -1,0 +1,4 @@
+[core]
+    remote = storage
+['remote "storage"']
+    url = https://dagshub.com/Sebas19812002/Proyecto_DSA_Grupo_30.dvc
