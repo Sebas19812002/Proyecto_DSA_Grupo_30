@@ -1,17 +1,21 @@
 # %% Cargar los datos
+from pathlib import Path
 import pandas as pd
 import matplotlib.pyplot as plt
 
-df = pd.read_csv("Electric_Vehicle_Charging_Station_Data.csv")
+ruta_datos = Path(__file__).resolve().parent / "Electric_Vehicle_Charging_Station_Data.csv"
+df = pd.read_csv(ruta_datos)
+
 print("Filas y columnas:", df.shape)
 print()
 print(df.dtypes)
 df.head()
+
 # %% Calidad de los datos
 print("Nulos por columna:")
 print(df.isna().sum())
 print()
-print("Filas duplicadas:", df.duplicated().sum())
+print("Filas completamente idénticas (incluyendo identificadores): ", df.duplicated().sum())
 print("Estaciones distintas:", df["Station_Name"].nunique())
 print()
 print("Ejemplos de fechas:")
@@ -85,8 +89,19 @@ print()
 
 # Limpieza
 n0 = len(df)
-limpio = df[df["formato_fecha"] == "m/d/Y"]
+limpio = df[df["formato_fecha"] == "m/d/Y"].copy()
 print("Quitando duplicados ISO:       ", n0 - len(limpio))
+n_antes = len(limpio)
+columnas_comparacion = [
+    c for c in limpio.columns
+    if c not in ["ObjectID", "ObjectId2"]]
+
+limpio = limpio.drop_duplicates(subset=columnas_comparacion).copy()
+
+print("Quitando duplicados adicionales:", n_antes - len(limpio))
+# Conservar los datos deduplicados antes de excluir sesiones con 0 kWh
+sin_dup = limpio.copy()
+
 n1 = len(limpio)
 limpio = limpio[limpio["duracion_h"] > 0]
 print("Quitando duración 0:           ", n1 - len(limpio))
@@ -99,7 +114,6 @@ print()
 print(f"Sesiones finales: {len(limpio):,} de {n0:,} ({len(limpio) / n0 * 100:.1f}%)")
 print()
 print("% de sesiones con 0 kWh por año (sin duplicados):")
-sin_dup = df[df["formato_fecha"] == "m/d/Y"]
 print((sin_dup.groupby(sin_dup["inicio"].dt.year)["Energy__kWh_"].apply(lambda x: (x == 0).mean()) * 100).round(1))
 
 # %% Sesiones diarias por estación (variable objetivo)
