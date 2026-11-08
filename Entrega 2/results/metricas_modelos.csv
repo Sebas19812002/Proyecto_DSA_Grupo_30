@@ -1,0 +1,4 @@
+modelo,val_MAE,val_RMSE,test_MAE,test_RMSE
+Ridge,1.4328,1.8467,1.5333,1.9582
+HistGradientBoosting,1.4414,1.8526,1.5656,1.9887
+RandomForest,1.4513,1.8595,1.5849,2.0163
