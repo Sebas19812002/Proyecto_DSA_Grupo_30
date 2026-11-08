@@ -233,7 +233,37 @@ def score(y_true, y_pred) -> dict:
             "sesiones_predichas_media": round(float(np.mean(p)), 4)}
 
 
-def experiment(frame: pd.DataFrame, folder: Path, train_end: str, val_end: str, tracking_uri=None, experiment_name=None):
+# Configuraciones evaluadas
+CONFIGURACIONES = [
+    ("Ridge", {"alpha": 0.1}),
+    ("Ridge", {"alpha": 1.0}),
+    ("Ridge", {"alpha": 10.0}),
+    ("Ridge", {"alpha": 100.0}),
+    ("RandomForest", {"n_estimators": 120, "max_depth": 6, "min_samples_leaf": 3}),
+    ("RandomForest", {"n_estimators": 120, "max_depth": 12, "min_samples_leaf": 3}),
+    ("RandomForest", {"n_estimators": 300, "max_depth": 16, "min_samples_leaf": 5}),
+    ("HistGradientBoosting", {"max_iter": 120, "max_depth": 3, "learning_rate": 0.03}),
+    ("HistGradientBoosting", {"max_iter": 120, "max_depth": 5, "learning_rate": 0.07}),
+    ("HistGradientBoosting", {"max_iter": 200, "max_depth": 5, "learning_rate": 0.15}),
+]
+
+
+def build_estimator(familia: str, params: dict):
+    if familia == "Ridge":
+        return Ridge(**params)
+    if familia == "RandomForest":
+        return RandomForestRegressor(**params, n_jobs=-1, random_state=SEED)
+    if familia == "HistGradientBoosting":
+        return HistGradientBoostingRegressor(**params, random_state=SEED)
+    raise ValueError(f"Familia de modelo desconocida: {familia}")
+
+
+def run_name(familia: str, params: dict) -> str:
+    return familia + "_" + "_".join(f"{k}={v}" for k, v in params.items())
+
+
+def experiment(frame: pd.DataFrame, folder: Path, train_end: str, val_end: str, tracking_uri=None,
+               experiment_name=None, autor=None, registered_model=None):
     features = ["estacion", "dia_semana", "mes", "dia_anio", "lag_1", "lag_7", "lag_14", "media_7_pasados", "media_14_pasados"]
     cats = ["estacion"]
     nums = [x for x in features if x not in cats]
@@ -242,64 +272,75 @@ def experiment(frame: pd.DataFrame, folder: Path, train_end: str, val_end: str, 
     test = frame.loc[frame.fecha > pd.Timestamp(val_end)]
     if min(len(train), len(val), len(test)) <= 0:
         raise ValueError("No existen filas suficientes para separar entrenamiento, validación y prueba.")
-    def preprocessor():
-        return ColumnTransformer([("categorica", OneHotEncoder(handle_unknown="ignore"), cats),
-                                  ("numerica", SimpleImputer(strategy="median"), nums)])
-    models = {
-        "Ridge": Ridge(alpha=10.0),
-        "RandomForest": RandomForestRegressor(n_estimators=120, max_depth=12, min_samples_leaf=3,
-                                               n_jobs=-1, random_state=SEED),
-        # HistGradientBoosting trabaja con matrices densas; OneHotEncoder aquí usa sparse_output=False.
-        "HistGradientBoosting": HistGradientBoostingRegressor(max_iter=120, max_depth=5,
-                                                               learning_rate=0.07, random_state=SEED),
-    }
     baseline_val = score(val.sesiones, val.lag_7)
     baseline_test = score(test.sesiones, test.lag_7)
-    records, fitted = [], {}
+
+    # --- 1. Conexión con MLflow (solo si se pasa --tracking-uri) ---
     mlflow = None
+    tags_comunes = {}
     if tracking_uri:
         try:
             import mlflow as _mlflow
+            import mlflow.sklearn  # noqa: F401
             mlflow = _mlflow
         except ImportError as exc:
             raise RuntimeError("Se indicó --tracking-uri, pero mlflow no está instalado.") from exc
         mlflow.set_tracking_uri(tracking_uri)
         mlflow.set_experiment(experiment_name or "DSA-recarga-Boulder")
-    for name, estimator in models.items():
-        # Garantizar representación densa compatible con HistGradientBoosting.
-        # sklearn >=1.2: sparse_output=False; en otros entornos utilizar el fallback.
+        tags_comunes = {"proyecto": "DSA Grupo 30", "entrega": "2", "autor": autor or "grupo30",
+                        "estaciones": ", ".join(sorted(frame.estacion.unique()))}
+        datos_comunes = {"train_end": train_end, "val_end": val_end, "random_state": SEED,
+                         "numero_estaciones": int(frame.estacion.nunique()),
+                         "filas_train": len(train), "filas_val": len(val), "filas_test": len(test),
+                         "features": ",".join(features)}
+
+        # --- 2. Run de referencia: predecir con el valor de hace 7 días (sin entrenar nada) ---
+        with mlflow.start_run(run_name="Baseline_lag7"):
+            mlflow.set_tags({**tags_comunes, "familia": "Baseline"})
+            mlflow.log_params({**datos_comunes, "modelo": "Baseline_lag7"})
+            mlflow.log_metrics({"val_MAE": baseline_val["MAE"], "val_RMSE": baseline_val["RMSE"],
+                                "test_MAE": baseline_test["MAE"], "test_RMSE": baseline_test["RMSE"]})
+
+    # --- 3. Entrenar cada configuración de la lista CONFIGURACIONES ---
+    records, fitted = [], {}
+    for familia, params in CONFIGURACIONES:
+        name = run_name(familia, params)
+        # OneHotEncoder denso para que HistGradientBoosting funcione.
         try:
             encoder = OneHotEncoder(handle_unknown="ignore", sparse_output=False)
         except TypeError:
             encoder = OneHotEncoder(handle_unknown="ignore", sparse=False)
         prep = ColumnTransformer([("categorica", encoder, cats),
                                   ("numerica", SimpleImputer(strategy="median"), nums)])
-        pipe = Pipeline([("preprocesamiento", prep), ("modelo", estimator)])
+        pipe = Pipeline([("preprocesamiento", prep), ("modelo", build_estimator(familia, params))])
         pipe.fit(train[features], train.sesiones)
         val_pred = pipe.predict(val[features])
         test_pred = pipe.predict(test[features])
         val_metrics, test_metrics = score(val.sesiones, val_pred), score(test.sesiones, test_pred)
-        records.append({"modelo": name, "val_MAE": val_metrics["MAE"], "val_RMSE": val_metrics["RMSE"],
+        records.append({"modelo": name, "familia": familia, **{f"hp_{k}": v for k, v in params.items()},
+                        "val_MAE": val_metrics["MAE"], "val_RMSE": val_metrics["RMSE"],
                         "test_MAE": test_metrics["MAE"], "test_RMSE": test_metrics["RMSE"]})
         fitted[name] = (pipe, val_pred, test_pred)
-        if mlflow:
-            with mlflow.start_run(run_name=name):
-                mlflow.log_params({"modelo": name, "train_end": train_end, "val_end": val_end,
-                                   "numero_estaciones": int(frame.estacion.nunique()), "random_state": SEED})
-                mlflow.log_params({
-                    f"hp_{k}": str(v)
-                    for k, v in estimator.get_params(deep=False).items()})
+        print(f"{name}: val_MAE={val_metrics['MAE']}  test_MAE={test_metrics['MAE']}")
 
+        # --- 4. Registrar el run en MLflow ---
+        if mlflow:
+            with mlflow.start_run(run_name=name) as run:
+                mlflow.set_tags({**tags_comunes, "familia": familia})
+                mlflow.log_params({**datos_comunes, "modelo": familia})
+                mlflow.log_params({f"hp_{k}": v for k, v in params.items()})
                 mlflow.log_metrics({"val_MAE": val_metrics["MAE"], "val_RMSE": val_metrics["RMSE"],
                                     "test_MAE": test_metrics["MAE"], "test_RMSE": test_metrics["RMSE"],
-                                    "baseline_val_MAE": baseline_val["MAE"]})
-                mlflow.sklearn.log_model(
-                    sk_model=pipe,
-                    name="modelo",
-                    serialization_format="cloudpickle")
+                                    "mejora_vs_baseline_val_MAE": round(baseline_val["MAE"] - val_metrics["MAE"], 4)})
+                info = mlflow.sklearn.log_model(sk_model=pipe, name="modelo",
+                                                input_example=train[features].head(5).astype({c: "float64" for c in nums}),
+                                                serialization_format="cloudpickle")
+                fitted[name] = (pipe, val_pred, test_pred, run.info.run_id, info.model_uri)
 
+    # --- 5. Elegir el ganador (menor MAE de validación) y guardar resultados locales ---
     metrics_df = pd.DataFrame(records).sort_values("val_MAE")
     winner = str(metrics_df.iloc[0].modelo)
+    winner_familia = str(metrics_df.iloc[0].familia)
     joblib.dump({"model": fitted[winner][0], "features": features,
                  "stations": sorted(frame.estacion.unique().tolist()), "winner": winner,
                  "train_end": train_end, "val_end": val_end}, folder / "modelo_seleccionado.joblib")
@@ -309,9 +350,21 @@ def experiment(frame: pd.DataFrame, folder: Path, train_end: str, val_end: str, 
     pred.rename(columns={"sesiones": "real_asumido", "lag_7":"prediccion_baseline_7d"}).to_csv(
         folder / "predicciones_prueba.csv", index=False)
     metrics_df.to_csv(folder / "metricas_modelos.csv", index=False)
+
+    # --- 6. En MLflow: marcar el ganador, adjuntar resultados y registrar el modelo ---
+    if mlflow:
+        winner_run = fitted[winner][3]
+        client = mlflow.tracking.MlflowClient()
+        client.set_tag(winner_run, "seleccionado", "si")
+        client.log_artifact(winner_run, str(folder / "metricas_modelos.csv"), "resultados")
+        client.log_artifact(winner_run, str(folder / "predicciones_prueba.csv"), "resultados")
+        if registered_model:
+            mlflow.register_model(fitted[winner][4], registered_model)
+
     return {"filas_entrenamiento":len(train), "filas_validacion":len(val), "filas_prueba":len(test),
             "baseline_semanal": {"validacion": baseline_val, "prueba": baseline_test},
-            "mejor_modelo_segun_validacion": winner, "metricas_modelos": records,
+            "mejor_modelo_segun_validacion": winner, "familia_mejor_modelo": winner_familia,
+            "metricas_modelos": records,
             "advertencia": "La evaluación usa lags reales del histórico; para un escenario futuro simulado "
                            "debe proporcionarse un histórico actualizado hasta el día previo al pronóstico."}
 
@@ -326,6 +379,9 @@ def main():
     ap.add_argument("--val-end", default="2023-06-30")
     ap.add_argument("--tracking-uri", default=None)
     ap.add_argument("--experiment", default="DSA-recarga-Boulder")
+    ap.add_argument("--autor", default=None, help="Nombre que queda como tag en MLflow")
+    ap.add_argument("--registered-model", default="modelo-recarga-boulder",
+                    help="Nombre en el Model Registry de MLflow para el modelo ganador")
     args=ap.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     sessions, cleaning = prepare_sessions(args.csv, args.exclude_stations)
@@ -336,7 +392,8 @@ def main():
     panel = panel[panel.estacion.isin(selection.estacion)].copy()
     panel.to_csv(args.out/"panel_diario_cinco_estaciones.csv", index=False)
     training_frame = features_from_panel(panel)
-    exp = experiment(training_frame,args.out,args.train_end,args.val_end,args.tracking_uri,args.experiment)
+    exp = experiment(training_frame,args.out,args.train_end,args.val_end,args.tracking_uri,args.experiment,
+                    args.autor,args.registered_model)
     report={"limpieza":cleaning,"seleccion":selection.estacion.tolist(),"experimentos":exp,
             "politica_ceros":"Días intermedios sin sesión registrados como cero provisional, no probado; "
                             "no rellenar fuera de la ventana primera-última sesión. Verificar faltantes reales."}
