@@ -34,28 +34,110 @@
         "sesiones_predichas_media": 4.9712
       }
     },
-    "mejor_modelo_segun_validacion": "Ridge",
+    "mejor_modelo_segun_validacion": "Ridge_alpha=0.1",
+    "familia_mejor_modelo": "Ridge",
     "metricas_modelos": [
       {
-        "modelo": "Ridge",
+        "modelo": "Ridge_alpha=0.1",
+        "familia": "Ridge",
+        "hp_alpha": 0.1,
+        "val_MAE": 1.4328,
+        "val_RMSE": 1.8467,
+        "test_MAE": 1.5334,
+        "test_RMSE": 1.9582
+      },
+      {
+        "modelo": "Ridge_alpha=1.0",
+        "familia": "Ridge",
+        "hp_alpha": 1.0,
+        "val_MAE": 1.4328,
+        "val_RMSE": 1.8467,
+        "test_MAE": 1.5334,
+        "test_RMSE": 1.9582
+      },
+      {
+        "modelo": "Ridge_alpha=10.0",
+        "familia": "Ridge",
+        "hp_alpha": 10.0,
         "val_MAE": 1.4328,
         "val_RMSE": 1.8467,
         "test_MAE": 1.5333,
         "test_RMSE": 1.9582
       },
       {
-        "modelo": "RandomForest",
+        "modelo": "Ridge_alpha=100.0",
+        "familia": "Ridge",
+        "hp_alpha": 100.0,
+        "val_MAE": 1.4329,
+        "val_RMSE": 1.8465,
+        "test_MAE": 1.5321,
+        "test_RMSE": 1.9579
+      },
+      {
+        "modelo": "RandomForest_n_estimators=120_max_depth=6_min_samples_leaf=3",
+        "familia": "RandomForest",
+        "hp_n_estimators": 120,
+        "hp_max_depth": 6,
+        "hp_min_samples_leaf": 3,
+        "val_MAE": 1.446,
+        "val_RMSE": 1.8541,
+        "test_MAE": 1.5582,
+        "test_RMSE": 1.9847
+      },
+      {
+        "modelo": "RandomForest_n_estimators=120_max_depth=12_min_samples_leaf=3",
+        "familia": "RandomForest",
+        "hp_n_estimators": 120,
+        "hp_max_depth": 12,
+        "hp_min_samples_leaf": 3,
         "val_MAE": 1.4513,
         "val_RMSE": 1.8595,
         "test_MAE": 1.5849,
         "test_RMSE": 2.0163
       },
       {
-        "modelo": "HistGradientBoosting",
+        "modelo": "RandomForest_n_estimators=300_max_depth=16_min_samples_leaf=5",
+        "familia": "RandomForest",
+        "hp_n_estimators": 300,
+        "hp_max_depth": 16,
+        "hp_min_samples_leaf": 5,
+        "val_MAE": 1.4513,
+        "val_RMSE": 1.8617,
+        "test_MAE": 1.581,
+        "test_RMSE": 2.0079
+      },
+      {
+        "modelo": "HistGradientBoosting_max_iter=120_max_depth=3_learning_rate=0.03",
+        "familia": "HistGradientBoosting",
+        "hp_max_iter": 120,
+        "hp_max_depth": 3,
+        "hp_learning_rate": 0.03,
+        "val_MAE": 1.455,
+        "val_RMSE": 1.865,
+        "test_MAE": 1.5344,
+        "test_RMSE": 1.9589
+      },
+      {
+        "modelo": "HistGradientBoosting_max_iter=120_max_depth=5_learning_rate=0.07",
+        "familia": "HistGradientBoosting",
+        "hp_max_iter": 120,
+        "hp_max_depth": 5,
+        "hp_learning_rate": 0.07,
         "val_MAE": 1.4414,
         "val_RMSE": 1.8526,
         "test_MAE": 1.5656,
         "test_RMSE": 1.9887
+      },
+      {
+        "modelo": "HistGradientBoosting_max_iter=200_max_depth=5_learning_rate=0.15",
+        "familia": "HistGradientBoosting",
+        "hp_max_iter": 200,
+        "hp_max_depth": 5,
+        "hp_learning_rate": 0.15,
+        "val_MAE": 1.5061,
+        "val_RMSE": 1.9413,
+        "test_MAE": 1.5656,
+        "test_RMSE": 2.0172
       }
     ],
     "advertencia": "La evaluación usa lags reales del histórico; para un escenario futuro simulado debe proporcionarse un histórico actualizado hasta el día previo al pronóstico."
