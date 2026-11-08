@@ -6,24 +6,42 @@ Código inicial para preparar los datos de estaciones de Boulder, comparar model
 
 ## Pasos en Windows (Git Bash o PowerShell)
 
-1. Copiar el CSV del proyecto a `data/Electric_Vehicle_Charging_Station_Data.csv`.
-2. Desde la carpeta `dsa_entrega2_base`, ejecutar:
-
+1. Traer el CSV con `dvc pull` (queda en `Entrega 1/Electric_Vehicle_Charging_Station_Data.csv`).
+2. Desde la carpeta `Entrega 2`, ejecutar:
+ 
 ```bash
 python -m venv .venv
 # PowerShell: .venv\Scripts\Activate.ps1
 # Git Bash: source .venv/Scripts/activate
 python -m pip install -r requirements.txt
-python src/entrega2.py --csv data/Electric_Vehicle_Charging_Station_Data.csv
+python src/entrega2.py --csv ../Entrega 1/Electric_Vehicle_Charging_Station_Data.csv
 ```
 
-Si usan MLflow en EC2 con túnel SSH local activo:
+## Experimentos en MLflow (AWS EC2)
+
+Los experimentos se ejecutan en una instancia EC2 (t2.medium, Ubuntu 24.04, 30 GB) con el servidor de MLflow en el puerto 8050. El repositorio se clona en la máquina y el CSV se descarga con `dvc pull`.
+
+Cada ejecución crea en el experimento `DSA-recarga-Boulder`:
+
+- Un run `Baseline_lag7` (predice con el valor de hace 7 días) como referencia.
+- Diez runs, uno por configuración de hiperparámetros: cuatro de Ridge (`alpha`), tres de RandomForest (`n_estimators`, `max_depth`, `min_samples_leaf`) y tres de HistGradientBoosting (`max_iter`, `max_depth`, `learning_rate`). Las configuraciones están en la lista `CONFIGURACIONES` de `src/entrega2.py`.
+- En cada run: parámetros, métricas (`val_MAE`, `val_RMSE`, `test_MAE`, `test_RMSE`, `mejora_vs_baseline_val_MAE`), tags (`familia`, `autor`, `entrega`) y el modelo.
+- El run con menor `val_MAE` queda con el tag `seleccionado=si`, guarda `metricas_modelos.csv` y `predicciones_prueba.csv` como artefactos y se registra como una nueva versión de `modelo-recarga-boulder` en el Model Registry.
+
+En la máquina EC2:
 
 ```bash
-python src/entrega2.py --csv data/Electric_Vehicle_Charging_Station_Data.csv --tracking-uri http://127.0.0.1:8050
+# Terminal 1: servidor de MLflow (dejar abierta)
+source .venv/bin/activate
+mlflow server -h 0.0.0.0 -p 8050 --allowed-hosts "localhost:8050,<IP>:8050" --cors-allowed-origins "http://<IP>:8050"
+
+# Terminal 2: experimentos
+source .venv/bin/activate
+cd Proyecto_DSA_Grupo_30/"Entrega 2"
+python3 src/entrega2.py --csv "../Entrega 1/Electric_Vehicle_Charging_Station_Data.csv" --tracking-uri http://localhost:8050
 ```
 
-**Importante:** la conexión a MLflow debe realizarse con el servidor realmente iniciado y accesible. No se ha ejecutado ningún experimento real contra EC2 desde aquí.
+Interfaz: `http://<IP>:8050`. La selección del mejor modelo usa solo validación; el conjunto de prueba se reporta sin optimizar sobre él.
 
 ## Resultados
 
