@@ -1,0 +1,22 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    image: dsa-boulder-api:entrega3
+    environment:
+      DSA_RESULTS_DIR: /app/results
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    image: dsa-boulder-dashboard:entrega3
+    ports:
+      - "8501:8501"
+    environment:
+      DSA_API_URL: http://api:8000
+    depends_on:
+      - api
+    restart: unless-stopped
