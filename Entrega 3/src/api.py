@@ -1,6 +1,6 @@
 """API FastAPI para simulación retrospectiva honesta de inferencia de un día.
 
-Ejecutar desde la raíz de dsa_entrega2_base:
+Ejecutar desde la raíz de dsa_entrega3_base:
     uvicorn src.api:app --reload --port 8000
 
 Este prototipo NO recibe actualizaciones en tiempo real ni afirma pronosticar 2026.
