@@ -386,7 +386,7 @@ def experiment(frame: pd.DataFrame, folder: Path, train_end: str, val_end: str, 
 
 
 def main():
-    ap=argparse.ArgumentParser(description="DSA entrega 2 Boulder")
+    ap=argparse.ArgumentParser(description="DSA entrega 3 Boulder")
     ap.add_argument("--csv", required=True, type=Path)
     ap.add_argument("--out", default=Path("results"), type=Path)
     ap.add_argument("--exclude-stations", type=Path, default=None)

@@ -4,6 +4,8 @@ services:
       context: .
       dockerfile: Dockerfile.api
     image: dsa-boulder-api:entrega3
+    ports:
+      - "8000:8000"
     environment:
       DSA_RESULTS_DIR: /app/results
     restart: unless-stopped

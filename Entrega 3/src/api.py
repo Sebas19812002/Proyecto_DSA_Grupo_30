@@ -16,9 +16,9 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 try:
-    from .entrega2 import features_from_panel
+    from .entrega3 import features_from_panel
 except ImportError:
-    from entrega2 import features_from_panel
+    from entrega3 import features_from_panel
 
 app = FastAPI(title="EV Charging Analytics - DSA", version="0.1.0",
               description="Predicción histórica de sesiones diarias, exclusivamente para evaluación.")
