@@ -1,0 +1,17 @@
+# Identidad visual de EV Charging Analytics.
+[theme]
+base = "light"
+primaryColor = "#103C36"
+backgroundColor = "#F5F8F7"
+secondaryBackgroundColor = "#E0F1ED"
+textColor = "#153E38"
+font = "sans serif"
+
+[theme.sidebar]
+backgroundColor = "#103C36"
+textColor = "#EFFCF8"
+primaryColor = "#8ADBCB"
+
+# Oculta opciones de desarrollo, incluido Deploy.
+[client]
+toolbarMode = "viewer"

@@ -1,0 +1,20 @@
+
+FROM python:3.14-slim
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV DSA_RESULTS_DIR=/app/results
+
+COPY requirements-api.txt .
+
+RUN pip install --no-cache-dir -r requirements-api.txt
+
+COPY src/ ./src/
+COPY results/modelo_seleccionado.joblib ./results/modelo_seleccionado.joblib
+COPY results/panel_diario_cinco_estaciones.csv ./results/panel_diario_cinco_estaciones.csv
+
+EXPOSE 8000
+
+CMD ["uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000"]

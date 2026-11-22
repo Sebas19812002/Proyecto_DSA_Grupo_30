@@ -1,0 +1,10 @@
+cat > "Entrega 3/.gitignore" <<'EOF'
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+EOF
