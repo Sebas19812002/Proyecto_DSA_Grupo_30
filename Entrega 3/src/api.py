@@ -1,6 +1,6 @@
 """API FastAPI para simulación retrospectiva honesta de inferencia de un día.
 
-Ejecutar desde la raíz de dsa_entrega2_base:
+Ejecutar desde la raíz de dsa_entrega3_base:
     uvicorn src.api:app --reload --port 8000
 
 Este prototipo NO recibe actualizaciones en tiempo real ni afirma pronosticar 2026.
@@ -16,9 +16,9 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 try:
-    from .entrega2 import features_from_panel
+    from .entrega3 import features_from_panel
 except ImportError:
-    from entrega2 import features_from_panel
+    from entrega3 import features_from_panel
 
 app = FastAPI(title="EV Charging Analytics - DSA", version="0.1.0",
               description="Predicción histórica de sesiones diarias, exclusivamente para evaluación.")
