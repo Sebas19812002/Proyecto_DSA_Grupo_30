@@ -207,6 +207,86 @@ def grafica(
         use_container_width=True)
 
 
+def grafica_dia_semana(
+    tabla: pd.DataFrame,
+    dia: pd.Timestamp,
+    dias: int
+) -> None:
+    """Promedio de sesiones por día de la semana con registros confirmados."""
+
+    datos = ventana(tabla, dia, dias)
+    datos = datos.loc[
+        (~datos["cero_asumido"]) & datos["sesiones"].notna()
+    ].copy()
+
+    if datos.empty:
+        st.info("No hay registros confirmados para analizar este periodo.")
+        return
+
+    nombres = {
+        0: "Lunes",
+        1: "Martes",
+        2: "Miércoles",
+        3: "Jueves",
+        4: "Viernes",
+        5: "Sábado",
+        6: "Domingo",
+    }
+
+    datos["dia_numero"] = datos["fecha"].dt.dayofweek
+    datos["dia_semana"] = datos["dia_numero"].map(nombres)
+
+    resumen_dias = (
+        datos.groupby(["dia_numero", "dia_semana"], as_index=False)
+        .agg(
+            promedio_sesiones=("sesiones", "mean"),
+            dias_registrados=("sesiones", "count")
+        )
+        .sort_values("dia_numero")
+    )
+
+    orden = list(nombres.values())
+
+    grafico = (
+        alt.Chart(resumen_dias)
+        .mark_bar(color=TURQUESA, cornerRadiusTopLeft=4,
+                  cornerRadiusTopRight=4)
+        .encode(
+            x=alt.X(
+                "dia_semana:N",
+                sort=orden,
+                title=None,
+                axis=alt.Axis(labelAngle=0)
+            ),
+            y=alt.Y(
+                "promedio_sesiones:Q",
+                title="Promedio de sesiones"
+            ),
+            tooltip=[
+                alt.Tooltip("dia_semana:N", title="Día"),
+                alt.Tooltip(
+                    "promedio_sesiones:Q",
+                    title="Promedio de sesiones",
+                    format=".2f"
+                ),
+                alt.Tooltip(
+                    "dias_registrados:Q",
+                    title="Días con registro"
+                )
+            ]
+        )
+        .properties(height=260)
+    )
+
+    st.altair_chart(grafico, use_container_width=True)
+
+    st.caption(
+        f"Promedio calculado con {len(datos)} días con registro "
+        f"en los {dias} días anteriores a la fecha seleccionada. "
+        "Se excluyen los días sin registro confirmado."
+    )
+
+
 def franja(mensaje: str) -> None:
     st.markdown(f'<div class="ev-foot">{mensaje}</div>', unsafe_allow_html=True)
 
@@ -361,6 +441,13 @@ elif seccion == "Análisis histórico":
         '<b>Calidad de datos:</b> los promedios excluyen días sin registro; '
         'la ausencia de una sesión registrada no demuestra inactividad de una estación. '
         'Comparación descriptiva, no ranking de capacidad disponible.')
+
+    st.markdown(
+        '<div class="ev-title">Patrón de sesiones por día de la semana</div>',
+        unsafe_allow_html=True
+    )
+
+    grafica_dia_semana(datos, objetivo, periodo)
 
 else:  # Simulación por fecha
     a, b, c, d = st.columns(4)
